@@ -2699,7 +2699,7 @@ class Scheduler(
     def append_last_decode_len_cost(self, session_id, v):
         list_str = str(session_id).encode('utf-8')
         key = hashlib.md5(list_str).hexdigest()
-        print(f'"{key}" : [{v}]')
+        logger.debug(f'"{key}" : [{v}]')
         if key in self.history_token_cost:
             if len(self.history_token_cost[key]) >= 6:
                 self.history_token_cost[key].pop(0)
