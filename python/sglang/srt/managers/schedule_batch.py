@@ -1951,7 +1951,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
         return retracted_reqs
 
     def retract_decode(
-        self, server_args: ServerArgs, history_token_cost
+        self, server_args: ServerArgs
     ) -> Tuple[List[Req], float, List[Req]]:
         """Retract the decoding requests when there is not enough memory."""
         sorted_indices = list(range(len(self.reqs)))
