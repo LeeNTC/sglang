@@ -19,6 +19,8 @@ import os
 import signal
 import sys
 import time
+import hashlib
+import statistics
 from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -431,6 +433,9 @@ class Scheduler(
 
         # Init profiler
         self.init_profiler()
+
+        # Init history token cost
+        self.history_token_cost = {}
 
         # Init prefill-decodedisaggregation
         self.init_disaggregation()
@@ -2419,6 +2424,15 @@ class Scheduler(
 
         # Get priority queue
         self.policy.calc_priority(self.waiting_queue, self.running_batch)
+ 
+        for req in self.waiting_queue:
+            session_id = req.origin_input_ids
+            list_str = str(session_id).encode('utf-8')
+            key = hashlib.md5(list_str).hexdigest()
+            if key in self.history_token_cost:
+                req.last_decode_len = statistics.mean(self.history_token_cost[key])
+        if self.server_args.enable_history_req_lens_db:
+            self.waiting_queue.sort(key=lambda x: (-x.last_decode_len))
 
         if TEST_RETRACT and running_bs > TEST_RETRACT_NO_PREFILL_BS:
             # If we are testing retraction and the running batch size exceeds
@@ -2625,7 +2639,7 @@ class Scheduler(
             old_available_tokens = self.token_to_kv_pool_allocator.available_size()
             old_ratio = self.new_token_ratio
             retracted_reqs, new_token_ratio, reqs_to_abort = batch.retract_decode(
-                self.server_args
+                self.server_args, self.history_token_cost
             )
             new_available_tokens = self.token_to_kv_pool_allocator.available_size()
             new_token_gained = new_available_tokens - old_available_tokens
@@ -2681,6 +2695,17 @@ class Scheduler(
         # Update batch tensors
         batch.prepare_for_decode()
         return batch
+
+    def append_last_decode_len_cost(self, session_id, v):
+        list_str = str(session_id).encode('utf-8')
+        key = hashlib.md5(list_str).hexdigest()
+        print(f'"{key}" : [{v}]')
+        if key in self.history_token_cost:
+            if len(self.history_token_cost[key]) >= 6:
+                self.history_token_cost[key].pop(0)
+            self.history_token_cost[key].append(v)
+        else:
+            self.history_token_cost[key] = [v]
 
     def record_batch_in_overlap(self, model_worker_batch: ModelWorkerBatch):
         # FIXME(lsyin): hacky way to keep a reference to avoid GPU tensors being freed by torch GC
@@ -2873,6 +2898,9 @@ class Scheduler(
     ):
         if batch.forward_mode.is_decode():
             self.process_batch_result_decode(batch, result)
+            for req in batch.reqs:
+                if self.server_args.enable_history_req_lens_db and req.finished():
+                    self.append_last_decode_len_cost(req.origin_input_ids, len(req.output_ids))
         elif batch.forward_mode.is_extend():
             if batch.is_dllm():
                 self.process_batch_result_dllm(batch, result)
@@ -2924,7 +2952,7 @@ class Scheduler(
                     success=False, message="Timed out waiting for idle state."
                 ),
                 pending_req,
-            )
+            ) 
 
     def add_external_corpus(
         self, recv_req: AddExternalCorpusReqInput
