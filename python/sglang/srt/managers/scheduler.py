@@ -2425,13 +2425,13 @@ class Scheduler(
         # Get priority queue
         self.policy.calc_priority(self.waiting_queue, self.running_batch)
  
-        for req in self.waiting_queue:
-            session_id = req.origin_input_ids
-            list_str = str(session_id).encode('utf-8')
-            key = hashlib.md5(list_str).hexdigest()
-            if key in self.history_token_cost:
-                req.last_decode_len = statistics.mean(self.history_token_cost[key])
         if self.server_args.enable_history_req_lens_db:
+            for req in self.waiting_queue:
+                list_str = str(req.origin_input_ids).encode('utf-8')
+                key = hashlib.md5(list_str).hexdigest()
+                if key in self.history_token_cost:
+                    costs = self.history_token_cost[key]
+                    req.last_decode_len = sum(costs) / len(costs)
             self.waiting_queue.sort(key=lambda x: (-x.last_decode_len))
 
         if TEST_RETRACT and running_bs > TEST_RETRACT_NO_PREFILL_BS:
