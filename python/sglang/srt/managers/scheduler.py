@@ -434,8 +434,9 @@ class Scheduler(
         # Init profiler
         self.init_profiler()
 
-        # Init history token cost
-        self.history_token_cost = {}
+        # LRU cache for history token cost (max 1024 entries to prevent memory leak)
+        self.history_token_cost = OrderedDict()
+        self.history_token_cost_max_size = 1024
 
         # Init prefill-decodedisaggregation
         self.init_disaggregation()
@@ -2424,11 +2425,10 @@ class Scheduler(
 
         # Get priority queue
         self.policy.calc_priority(self.waiting_queue, self.running_batch)
- 
+
         if self.server_args.enable_history_req_lens_db:
             for req in self.waiting_queue:
-                list_str = str(req.origin_input_ids).encode('utf-8')
-                key = hashlib.md5(list_str).hexdigest()
+                key = hash(tuple(req.origin_input_ids))
                 if key in self.history_token_cost:
                     costs = self.history_token_cost[key]
                     req.last_decode_len = sum(costs) / len(costs)
@@ -2697,14 +2697,16 @@ class Scheduler(
         return batch
 
     def append_last_decode_len_cost(self, session_id, v):
-        list_str = str(session_id).encode('utf-8')
-        key = hashlib.md5(list_str).hexdigest()
-        logger.debug(f'"{key}" : [{v}]')
+        key = hash(tuple(session_id))
         if key in self.history_token_cost:
+            self.history_token_cost.move_to_end(key)
             if len(self.history_token_cost[key]) >= 6:
                 self.history_token_cost[key].pop(0)
             self.history_token_cost[key].append(v)
         else:
+            # Evict oldest entry if at capacity
+            if len(self.history_token_cost) >= self.history_token_cost_max_size:
+                self.history_token_cost.popitem(last=False)
             self.history_token_cost[key] = [v]
 
     def record_batch_in_overlap(self, model_worker_batch: ModelWorkerBatch):

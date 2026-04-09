@@ -2043,13 +2043,8 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
     
     def cal_kvcache_free_req(self, sorted_indices):
         reqs_percent_list = []
-        seq_lens_cpu = self.seq_lens.cpu().numpy()
-        if get_tensor_model_parallel_rank() == 0:
-            logger.info(f"cal_kvcache_free_req  sorted_indices  {sorted_indices}")
-        for idx, index in enumerate(sorted_indices):
+        for index in enumerate(sorted_indices):
             req = self.reqs[index]
-            list_str = str(req.origin_input_ids).encode('utf-8')
-            key = hashlib.md5(list_str).hexdigest()
             current_decode_len = len(req.output_ids) - len(req.origin_input_ids)
             reqs_percent_list.append({
                 "idx":index,
