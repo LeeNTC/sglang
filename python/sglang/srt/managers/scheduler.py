@@ -19,7 +19,7 @@ import os
 import signal
 import sys
 import time
-from collections import deque, OrderedDict
+from collections import OrderedDict, deque
 from contextlib import nullcontext
 from dataclasses import dataclass
 from http import HTTPStatus
