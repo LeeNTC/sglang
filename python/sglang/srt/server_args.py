@@ -2825,8 +2825,9 @@ class ServerArgs:
             assert self.quantization in [
                 "fp8",
                 "mxfp8",
+                "modelopt_fp4",
                 None,
-            ], f"Invalid quantization '{self.quantization}'. \nFlashInfer TRTLLM routed MOE supports only: 'fp8', 'mxfp8', or bfloat16 (None)."
+            ], f"Invalid quantization '{self.quantization}'. \nFlashInfer TRTLLM routed MOE supports only: 'fp8', 'mxfp8', 'modelopt_fp4', or bfloat16 (None)."
             self.disable_shared_experts_fusion = True
             logger.warning(
                 "FlashInfer TRTLLM routed MoE is enabled. --disable-shared-experts-fusion is automatically set."
@@ -6571,6 +6572,12 @@ class ServerArgs:
                         f"but got --nsa-{label}-backend={backend}. "
                         f"Please use --nsa-{label}-backend=flashmla_sparse or omit it."
                     )
+
+            if self.kv_cache_dtype != "bfloat16":
+                raise ValueError(
+                    f"HiSparse requires bfloat16 KV cache, but got --kv-cache-dtype={self.kv_cache_dtype}. "
+                    f"Please use --kv-cache-dtype=bfloat16."
+                )
 
         assert (
             self.schedule_conservativeness >= 0
