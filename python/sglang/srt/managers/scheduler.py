@@ -2958,7 +2958,7 @@ class Scheduler(
                     success=False, message="Timed out waiting for idle state."
                 ),
                 pending_req,
-            ) 
+            )
 
     def add_external_corpus(
         self, recv_req: AddExternalCorpusReqInput
