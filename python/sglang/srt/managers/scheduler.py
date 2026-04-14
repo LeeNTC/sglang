@@ -2904,7 +2904,9 @@ class Scheduler(
             self.process_batch_result_decode(batch, result)
             for req in batch.reqs:
                 if self.server_args.enable_history_req_lens_db and req.finished():
-                    self.append_last_decode_len_cost(req.origin_input_ids, len(req.output_ids))
+                    self.append_last_decode_len_cost(
+                        req.origin_input_ids, len(req.output_ids)
+                    )
         elif batch.forward_mode.is_extend():
             if batch.is_dllm():
                 self.process_batch_result_dllm(batch, result)

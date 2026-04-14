@@ -48,7 +48,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 import torch
-import hashlib
 
 from sglang.srt.constrained.base_grammar_backend import BaseGrammarObject
 from sglang.srt.disaggregation.base import BaseKVSender
@@ -2006,7 +2005,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
     ) -> Tuple[List[Req], float, List[Req]]:
         """Retract the decoding requests when there is not enough memory."""
         sorted_indices = list(range(len(self.reqs)))
- 
+
         # TODO(lsyin): improve retraction policy for radix cache
         # For spec decoding, filter_batch API can only filter
         # requests from the back, so we can only retract from the back.
@@ -2091,20 +2090,22 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
         evict_from_tree_cache(self.tree_cache, num_tokens)
 
         req.reset_for_retract()
-    
+
     def cal_kvcache_free_req(self, sorted_indices):
         reqs_percent_list = []
         for index in enumerate(sorted_indices):
             req = self.reqs[index]
             current_decode_len = len(req.output_ids) - len(req.origin_input_ids)
-            reqs_percent_list.append({
-                "idx":index,
-                "per_token_num":max(req.last_decode_len, current_decode_len)
-                })
-        reqs_percent_list.sort(key=lambda x: (-x['per_token_num']))
+            reqs_percent_list.append(
+                {
+                    "idx": index,
+                    "per_token_num": max(req.last_decode_len, current_decode_len),
+                }
+            )
+        reqs_percent_list.sort(key=lambda x: (-x["per_token_num"]))
         sorted_list = []
         for req in reqs_percent_list:
-            sorted_list.append(req['idx'])
+            sorted_list.append(req["idx"])
         return sorted_list
 
     def prepare_encoder_info_decode(self):
